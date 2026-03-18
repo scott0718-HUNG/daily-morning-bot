@@ -22,22 +22,21 @@ LINE_USER_ID = os.environ.get("LINE_USER_ID")
 # 2. 核心功能函數
 # ==========================================
 
-def get_quote_and_prompt():
-    """使用 Gemini 產生繁體中文勵志語錄與英文生圖提示詞"""
+def get_quote():
+    """使用 Gemini 產生繁體中文勵志語錄"""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
     
+    # 簡化任務：只需要生成語錄，不再需要生圖提示詞
     prompt = """
     請幫我構思今天早上的勵志語錄。
     要求：
     1. 句子必須是非常經典、激勵人心、充滿正能量的「繁體中文」語錄。
     2. 必須提供出處與作者姓名。
-    3. 根據這句語錄的意境，寫一段用於 AI 產生背景圖片的「英文提示詞 (Prompt)」。背景圖片必須是唯美、真實攝影風格的人物或風景圖。
     
     請務必嚴格以 JSON 格式回傳，格式如下：
     {
         "quote": "勵志語錄內容",
-        "author": "《出處書名》- 作者姓名",
-        "image_prompt": "english prompt for beautiful realistic landscape or person photography"
+        "author": "《出處書名》- 作者姓名"
     }
     """
     
@@ -56,36 +55,33 @@ def get_quote_and_prompt():
     
     return json.loads(text_content)
 
-def generate_image(prompt_text):
-    """改用完全免費的 Pollinations.ai 產生圖片，並加入自動重試與保底機制"""
-    enhanced_prompt = f"Highly detailed, cinematic lighting, realistic photography, {prompt_text}"
-    encoded_prompt = urllib.parse.quote(enhanced_prompt)
-    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
-    
-    max_retries = 3
-    for attempt in range(max_retries):
-        print(f"正在向免費 AI 繪圖伺服器請求生成圖片 (第 {attempt + 1}/{max_retries} 次嘗試)...")
-        try:
-            # 加入 timeout 避免伺服器卡住無回應
-            response = requests.get(url, timeout=45)
-            response.raise_for_status() # 如果伺服器回傳 500，會在這裡觸發錯誤跳到 except
-            
-            # 成功取得圖片
-            return base64.b64encode(response.content).decode('utf-8')
-            
-        except requests.exceptions.RequestException as e:
-            print(f"⚠️ 伺服器暫時無回應或過載: {e}")
-            if attempt < max_retries - 1:
-                wait_time = 5 * (attempt + 1) # 漸進式等待：5秒、10秒...
-                print(f"等待 {wait_time} 秒後重新嘗試...")
-                time.sleep(wait_time)
-            else:
-                print("❌ 重試達上限，啟用備用保底風景圖...")
-                # 備用方案：使用最簡單極致的日出提示詞，確保一定能產出圖片
-                backup_url = "https://image.pollinations.ai/prompt/beautiful%20sunrise%20landscape%20photography%20golden%20hour?width=1024&height=1024&nologo=true"
-                response = requests.get(backup_url, timeout=45)
-                response.raise_for_status()
-                return base64.b64encode(response.content).decode('utf-8')
+def get_daily_background():
+    """獲取微軟 Bing 每日精選高品質風景圖作為背景"""
+    print("正在獲取微軟 Bing 每日精選風景圖...")
+    try:
+        # 微軟 Bing 每日桌布 API (免 Key、極度穩定、每日更新)
+        url = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=zh-TW"
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        # 取得高畫質圖片網址
+        image_url = "https://www.bing.com" + data['images'][0]['url']
+        
+        # 下載圖片
+        img_response = requests.get(image_url, timeout=15)
+        img_response.raise_for_status()
+        
+        return base64.b64encode(img_response.content).decode('utf-8')
+        
+    except Exception as e:
+        print(f"⚠️ Bing 圖片獲取失敗 ({e})，啟用 Picsum 隨機圖備用方案...")
+        # 備用方案：Lorem Picsum 隨機高品質相片 (加入時間亂數確保每次不同)
+        random_seed = int(time.time())
+        backup_url = f"https://picsum.photos/seed/{random_seed}/1080/1080"
+        img_response = requests.get(backup_url, timeout=15)
+        img_response.raise_for_status()
+        return base64.b64encode(img_response.content).decode('utf-8')
 
 def get_font(size):
     """動態下載 Google Noto Sans TC 開源字型以支援繁體中文"""
@@ -215,12 +211,12 @@ def send_line_message(image_url, quote, author):
 # ==========================================
 def main():
     try:
-        print("1. 正在生成語錄與提示詞...")
-        data = get_quote_and_prompt()
+        print("1. 正在生成語錄...")
+        data = get_quote() # 修改：使用簡化後的新函式
         print(f"取得語錄：{data['quote']}")
         
-        print("2. 正在呼叫 Imagen 4 生成背景圖片...")
-        base64_raw_img = generate_image(data['image_prompt'])
+        print("2. 正在獲取每日背景圖片...")
+        base64_raw_img = get_daily_background() # 修改：直接抓取微軟絕美桌布
         
         print("3. 正在合成圖片與文字...")
         base64_final_img = process_image(base64_raw_img, data['quote'], data['author'])
@@ -230,7 +226,6 @@ def main():
         print(f"圖片上傳成功：{img_url}")
         
         print("5. 正在發送 LINE 訊息...")
-        # 修改：將語錄文字一併傳給發送函式
         send_line_message(img_url, data['quote'], data['author'])
         
         print("✅ 每日早安圖任務執行完成！")
