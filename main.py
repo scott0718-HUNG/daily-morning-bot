@@ -106,9 +106,9 @@ def process_image(base64_img, quote, author):
     width, height = img.size
     
     # 載入字型
-    font_date = get_font(int(height * 0.04))
-    font_quote = get_font(int(height * 0.06))
-    font_author = get_font(int(height * 0.035))
+    font_date = get_font(int(height * 0.05))
+    font_quote = get_font(int(height * 0.12))
+    font_author = get_font(int(height * 0.05))
     
     # 1. 繪製左上角日期
     today_str = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y年%m月%d日")
@@ -139,7 +139,7 @@ def process_image(base64_img, quote, author):
     bbox = draw.textbbox((0, 0), wrapped_quote, font=font_quote)
     text_height = bbox[3] - bbox[1]
     
-    quote_y = height * 0.65 # 放在圖片 65% 高度的位置
+    quote_y = height * 0.50 # 放在圖片 65% 高度的位置
     
     # 逐行繪製置中文字
     lines = wrapped_quote.split('\n')
