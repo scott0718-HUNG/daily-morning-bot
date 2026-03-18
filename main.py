@@ -5,6 +5,7 @@ import datetime
 import requests
 import textwrap
 import urllib.request
+import urllib.parse # 新增：用於處理網址編碼
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 
@@ -55,28 +56,24 @@ def get_quote_and_prompt():
     return json.loads(text_content)
 
 def generate_image(prompt_text):
-    """使用 Gemini Imagen 4 模型產生圖片"""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key={GEMINI_API_KEY}"
-    
+    """改用完全免費的 Pollinations.ai 產生圖片 (無須 API Key)"""
     # 強制加入高畫質真實攝影的提示詞前綴
     enhanced_prompt = f"Highly detailed, cinematic lighting, realistic photography, {prompt_text}"
     
-    # 修正：精確符合 API 預期的物件格式
-    payload = {
-        "instances": {"prompt": enhanced_prompt},
-        "parameters": {"sampleCount": 1}
-    }
+    # 將提示詞進行 URL 編碼，確保含有空白或符號的句子能成為合法的網址
+    encoded_prompt = urllib.parse.quote(enhanced_prompt)
     
-    response = requests.post(url, json=payload)
+    # 呼叫 Pollinations API (設定長寬 1024x1024 與隱藏浮水印)
+    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
     
-    # 新增：如果發生錯誤，印出詳細的 API 拒絕原因，方便我們除錯
-    if response.status_code != 200:
-        print(f"\n❌ 圖片生成失敗！API 錯誤詳細回應：\n{response.text}\n")
-        
+    print("正在向免費 AI 繪圖伺服器請求生成圖片 (請稍候約 10-15 秒)...")
+    
+    # 直接取得圖片的二進位內容
+    response = requests.get(url)
     response.raise_for_status()
     
-    result = response.json()
-    base64_img = result['predictions'][0]['bytesBase64Encoded']
+    # 將下載下來的圖片轉換為 base64 字串，以符合後續加字與上傳的格式需求
+    base64_img = base64.b64encode(response.content).decode('utf-8')
     return base64_img
 
 def get_font(size):
