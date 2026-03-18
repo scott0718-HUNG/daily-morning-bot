@@ -1,0 +1,22 @@
+name: Daily Morning Boton:每天定時執行 (UTC時間 23:00，相當於台灣時間早上 7:00)schedule:- cron: '0 23 * * *'允許在 GitHub 網頁上手動點擊執行workflow_dispatch:jobs: build_and_send: runs-on: ubuntu-lateststeps:
+  - name: Checkout code
+    uses: actions/checkout@v4
+
+  - name: Set up Python
+    uses: actions/setup-python@v5
+    with:
+      python-version: '3.10'
+
+  - name: Install dependencies
+    run: |
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
+
+  - name: Run main script
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      IMGBB_API_KEY: ${{ secrets.IMGBB_API_KEY }}
+      LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+    run: python main.py
+
