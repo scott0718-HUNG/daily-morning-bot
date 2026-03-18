@@ -139,7 +139,7 @@ def process_image(base64_img, quote, author):
     bbox = draw.textbbox((0, 0), wrapped_quote, font=font_quote)
     text_height = bbox[3] - bbox[1]
     
-    quote_y = height * 0.50 # 放在圖片 65% 高度的位置
+    quote_y = height * 0.50 # 放在圖片 50% 高度的位置
     
     # 逐行繪製置中文字
     lines = wrapped_quote.split('\n')
@@ -155,7 +155,7 @@ def process_image(base64_img, quote, author):
     author_bbox = draw.textbbox((0, 0), author, font=font_author)
     author_width = author_bbox[2] - author_bbox[0]
     author_x = (width - author_width) / 2
-    author_y = current_y + 20
+    author_y = current_y + 40
     draw_text_with_shadow((author_x, author_y), author, font_author, text_color="#f0f0f0")
     
     # 轉換回 byte array 準備上傳
