@@ -6,6 +6,7 @@ import requests
 import textwrap
 import urllib.request
 import urllib.parse # 新增：用於處理網址編碼
+import time # 新增：用於處理 API 重試的等待時間
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 
@@ -56,25 +57,35 @@ def get_quote_and_prompt():
     return json.loads(text_content)
 
 def generate_image(prompt_text):
-    """改用完全免費的 Pollinations.ai 產生圖片 (無須 API Key)"""
-    # 強制加入高畫質真實攝影的提示詞前綴
+    """改用完全免費的 Pollinations.ai 產生圖片，並加入自動重試與保底機制"""
     enhanced_prompt = f"Highly detailed, cinematic lighting, realistic photography, {prompt_text}"
-    
-    # 將提示詞進行 URL 編碼，確保含有空白或符號的句子能成為合法的網址
     encoded_prompt = urllib.parse.quote(enhanced_prompt)
-    
-    # 呼叫 Pollinations API (設定長寬 1024x1024 與隱藏浮水印)
     url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
     
-    print("正在向免費 AI 繪圖伺服器請求生成圖片 (請稍候約 10-15 秒)...")
-    
-    # 直接取得圖片的二進位內容
-    response = requests.get(url)
-    response.raise_for_status()
-    
-    # 將下載下來的圖片轉換為 base64 字串，以符合後續加字與上傳的格式需求
-    base64_img = base64.b64encode(response.content).decode('utf-8')
-    return base64_img
+    max_retries = 3
+    for attempt in range(max_retries):
+        print(f"正在向免費 AI 繪圖伺服器請求生成圖片 (第 {attempt + 1}/{max_retries} 次嘗試)...")
+        try:
+            # 加入 timeout 避免伺服器卡住無回應
+            response = requests.get(url, timeout=45)
+            response.raise_for_status() # 如果伺服器回傳 500，會在這裡觸發錯誤跳到 except
+            
+            # 成功取得圖片
+            return base64.b64encode(response.content).decode('utf-8')
+            
+        except requests.exceptions.RequestException as e:
+            print(f"⚠️ 伺服器暫時無回應或過載: {e}")
+            if attempt < max_retries - 1:
+                wait_time = 5 * (attempt + 1) # 漸進式等待：5秒、10秒...
+                print(f"等待 {wait_time} 秒後重新嘗試...")
+                time.sleep(wait_time)
+            else:
+                print("❌ 重試達上限，啟用備用保底風景圖...")
+                # 備用方案：使用最簡單極致的日出提示詞，確保一定能產出圖片
+                backup_url = "https://image.pollinations.ai/prompt/beautiful%20sunrise%20landscape%20photography%20golden%20hour?width=1024&height=1024&nologo=true"
+                response = requests.get(backup_url, timeout=45)
+                response.raise_for_status()
+                return base64.b64encode(response.content).decode('utf-8')
 
 def get_font(size):
     """動態下載 Google Noto Sans TC 開源字型以支援繁體中文"""
