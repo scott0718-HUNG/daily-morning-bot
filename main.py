@@ -177,14 +177,14 @@ def upload_to_imgbb(base64_img_str):
 
 def send_line_message(image_url, quote, author):
     """透過 LINE Messaging API 傳送早安圖與純文字"""
-    url = "https://api.line.me/v2/bot/message/push"
+    url = "https://api.line.me/v2/bot/message/broadcast"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
     }
     # 修改：同時傳送「純文字」與「圖片」，作為雙重保險與除錯機制
     payload = {
-        "to": LINE_USER_ID,
+        ##"to": LINE_USER_ID,
         "messages": [
             {
                 "type": "text",
